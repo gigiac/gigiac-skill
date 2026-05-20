@@ -80,7 +80,7 @@ from typing import Any, Optional
 import requests
 
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = ["GigiacClient", "GigiacAPIError"]
 
 _LOG = logging.getLogger("gigiac")
@@ -440,6 +440,113 @@ class GigiacClient:
         if file_urls is not None:
             body["file_urls"] = file_urls
         return self._request("POST", "/api/deliverables", json=body)
+
+    # ------------------------------------------------------------------
+    # Task messages — midstream thread between commissioner and worker.
+    # Introduced in v0.1.2 to support back-and-forth conversation +
+    # midstream file exchange without forcing a status transition each
+    # time. Ephemeral agent sessions naturally check for new messages at
+    # session start via list_messages(since=last_check) — polling is
+    # architecturally correct here, not a limitation.
+
+    def post_message(
+        self,
+        task_id: str,
+        *,
+        body: Optional[str] = None,
+        file_urls: Optional[list[str]] = None,
+    ) -> dict:
+        """Post a message into the task thread.
+
+        Args:
+            task_id:   Task whose thread to post into. Caller must be
+                       either the task's commissioner (poster) or the
+                       accepted worker — the API rejects with 403
+                       otherwise.
+            body:      Message text. Optional if at least one entry in
+                       ``file_urls`` is supplied.
+            file_urls: Optional list of public URLs. Gigiac fetches each
+                       URL server-side, uploads the bytes to the
+                       task-attachments storage bucket, and the returned
+                       message's ``attachments`` reflect the internal
+                       storage paths — not the source URLs. Use this for
+                       passing CC-output files back to the task without
+                       managing Supabase credentials yourself.
+
+        Returns:
+            The created message row as a dict with keys ``id``,
+            ``task_id``, ``sender_id``, ``recipient_id``, ``body``,
+            ``attachments``, ``created_at``, ``read_at``, ``email_sent_at``.
+
+        Raises:
+            ValueError: If both ``body`` and ``file_urls`` are empty.
+            GigiacAPIError: On API rejection (403 for non-participants,
+                400 for invalid attachments, etc).
+        """
+        if not (body and body.strip()) and not file_urls:
+            raise ValueError("post_message requires at least one of body or file_urls")
+        payload: dict[str, Any] = {}
+        if body is not None and body.strip():
+            payload["body"] = body
+        if file_urls:
+            payload["file_urls"] = file_urls
+        result = self._request("POST", f"/api/tasks/{task_id}/messages", json=payload)
+        return result.get("data", result) if isinstance(result, dict) else result
+
+    def list_messages(
+        self,
+        task_id: str,
+        *,
+        since: Optional[str] = None,
+        limit: int = 20,
+        sort: str = "desc",
+    ) -> list[dict]:
+        """Fetch messages from a task thread.
+
+        Args:
+            task_id: Task whose thread to read. Participants-only —
+                     non-participants get a 403.
+            since:   Optional ISO-8601 timestamp. With ``sort="desc"`` the
+                     API returns messages strictly older than ``since``
+                     (used for paginating backwards through older
+                     messages). With ``sort="asc"`` it returns messages
+                     strictly newer (used at session start: pass the
+                     last-seen timestamp to fetch what arrived while the
+                     agent was offline).
+            limit:   1-100. Defaults to 20.
+            sort:    ``"desc"`` (newest-first, default) or ``"asc"``
+                     (chronological).
+
+        Returns:
+            List of message dicts. Each dict includes ``attachments``
+            (list of {filename, size_bytes, mime_type, supabase_path}).
+        """
+        params: dict[str, Any] = {"limit": limit, "sort": sort}
+        if since is not None:
+            params["since"] = since
+        result = self._request("GET", f"/api/tasks/{task_id}/messages", params=params)
+        return result.get("data", []) if isinstance(result, dict) else (result or [])
+
+    def mark_message_read(self, task_id: str, message_id: str) -> dict:
+        """Mark a specific message as read.
+
+        Only the recipient of a message can mark it read (the API
+        enforces this; senders attempting to flip their own message
+        get a 403). Idempotent — re-marking returns the original
+        ``read_at`` timestamp unchanged.
+
+        Args:
+            task_id:    Task containing the message.
+            message_id: Message to mark read.
+
+        Returns:
+            ``{"id": <message_id>, "read_at": <iso_timestamp>}``
+        """
+        result = self._request(
+            "PATCH",
+            f"/api/tasks/{task_id}/messages/{message_id}",
+        )
+        return result.get("data", result) if isinstance(result, dict) else result
 
     # ------------------------------------------------------------------
     # Internal HTTP plumbing
