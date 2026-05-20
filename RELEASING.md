@@ -20,8 +20,8 @@ In this order. Do not split or reorder.
 2. **Regenerate `SHA256SUMS`** — run the one-liner below. Output goes to the repo root.
 3. **Commit both in a single commit** — the content change AND the regenerated `SHA256SUMS` go into ONE commit. See "Why one commit" below.
 4. **Tag the commit** — `git tag vX.Y.Z` on the same commit as step 3.
-5. **Push commit + tag** — `git push origin main && git push origin vX.Y.Z`.
-6. **Create the GitHub release** — `gh release create vX.Y.Z --generate-notes` (or via the GitHub UI).
+5. **Push commit + tag** — `git push origin main && git push origin vX.Y.Z`. **The pushed tag is the canonical signal** for the gigiac.com skill-sync workflow and for `gh skill install` — both query the `/tags` API and resolve by semver order, not by GitHub Releases metadata.
+6. **(Optional) Create a GitHub Release** — `gh release create vX.Y.Z --generate-notes` (or via the UI) if you want release notes / a changelog surface. **Not required for the install pipeline to pick up the new version.** The skill-sync workflow used to query `/releases/latest`, which made Release-creation feel mandatory; since PR-SKILL-SYNC-3 it queries `/tags`, so a pushed tag alone is enough.
 7. **Smoke** — run the installer against the new tag end-to-end against a fake `$HOME`:
    ```
    curl -fsSL https://gigiac.com/install-claude-skill.sh \
