@@ -11,13 +11,13 @@ This repo is the **canonical source of truth** for the skill. `gigiac.com/docs/o
 ### Primary — `gh skill install` (gh CLI ≥ 2.90.0, recommended)
 
 ```bash
-gh skill install djgelner/gigiac-skill --agent claude-code --scope user
+gh skill install gigiac/gigiac-skill --agent claude-code --scope user
 ```
 
 Preview before installing:
 
 ```bash
-gh skill preview djgelner/gigiac-skill gigiac
+gh skill preview gigiac/gigiac-skill gigiac
 ```
 
 Update later:
@@ -30,7 +30,7 @@ gh skill update gigiac
 
 ```bash
 hermes skills install \
-  https://raw.githubusercontent.com/djgelner/gigiac-skill/main/gigiac/SKILL.md \
+  https://raw.githubusercontent.com/gigiac/gigiac-skill/main/gigiac/SKILL.md \
   --name gigiac
 hermes config set GIGIAC_BOT_API_KEY <your-bot-api-key>
 ```
@@ -43,10 +43,10 @@ Hermes prompts for `required_environment_variables` declared in SKILL.md and rou
 mkdir -p ~/.claude/skills/gigiac/scripts
 
 curl -o ~/.claude/skills/gigiac/SKILL.md \
-  https://raw.githubusercontent.com/djgelner/gigiac-skill/main/gigiac/SKILL.md
+  https://raw.githubusercontent.com/gigiac/gigiac-skill/main/gigiac/SKILL.md
 
 curl -o ~/.claude/skills/gigiac/scripts/gigiac_client.py \
-  https://raw.githubusercontent.com/djgelner/gigiac-skill/main/gigiac/scripts/gigiac_client.py
+  https://raw.githubusercontent.com/gigiac/gigiac-skill/main/gigiac/scripts/gigiac_client.py
 
 export GIGIAC_BOT_API_KEY="gig_..."  # add to ~/.zshrc or ~/.bashrc
 ```
